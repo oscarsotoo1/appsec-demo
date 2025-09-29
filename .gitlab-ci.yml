@@ -86,9 +86,7 @@ trivy_image:
     entrypoint: [""]
   script:
     - IMAGE_TAG="$(cat image_tag.txt)"
-    - trivy image --timeout "$TRIVY_TIMEOUT" --severity "$TRIVY_SEVERITY" --ignore-unfixed --exit-code 1 \
-        --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" \
-        "$IMAGE_TAG"
+    - trivy image --timeout "$TRIVY_TIMEOUT" --severity "$TRIVY_SEVERITY" --ignore-unfixed --exit-code 1 --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" "$IMAGE_TAG"
   allow_failure: false
   needs: ["build_image"]
 
@@ -99,9 +97,7 @@ sbom:
     entrypoint: [""]
   script:
     - IMAGE_TAG="$(cat image_tag.txt)"
-    - trivy image --format cyclonedx --output sbom.cdx.json \
-        --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" \
-        "$IMAGE_TAG"
+    - trivy image --format cyclonedx --output sbom.cdx.json --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" "$IMAGE_TAG"
   artifacts:
     paths:
       - sbom.cdx.json
