@@ -47,11 +47,15 @@ snyk:
     entrypoint: [""]
   variables:
     SNYK_DISABLE_ANALYTICS: "1"
+  before_script:
+    - python -V
+    - pip install -r requirements.txt
   script:
     - snyk auth "$SNYK_TOKEN"
     - snyk test --file=requirements.txt --package-manager=pip --severity-threshold=high
   allow_failure: false
   needs: ["pytest"]
+
 
 
 build_image:
