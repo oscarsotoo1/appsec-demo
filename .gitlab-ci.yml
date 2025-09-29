@@ -103,3 +103,10 @@ sbom:
       - sbom.cdx.json
   needs: ["build_image"]
 
+semgrep_sast:
+  stage: sast
+  image: returntocorp/semgrep:latest
+  script:
+    - semgrep ci --config auto
+  allow_failure: false
+
