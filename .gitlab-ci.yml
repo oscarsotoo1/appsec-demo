@@ -42,8 +42,9 @@ semgrep:
 
 snyk:
   stage: sca
-  image: snyk/snyk:python
-  entrypoint: [""]
+  image:
+    name: snyk/snyk:python
+    entrypoint: [""]
   variables:
     SNYK_DISABLE_ANALYTICS: "1"
   script:
@@ -51,6 +52,7 @@ snyk:
     - snyk test --file=requirements.txt --package-manager=pip --severity-threshold=high
   allow_failure: false
   needs: ["pytest"]
+
 
 build_image:
   stage: build
