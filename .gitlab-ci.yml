@@ -1,0 +1,101 @@
+stages:
+  - test
+  - sast
+  - sca
+  - build
+  - container_scan
+  - sbom
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  DOCKER_TLS_CERTDIR: "/certs"
+  TRIVY_SEVERITY: "HIGH,CRITICAL"
+  TRIVY_TIMEOUT: "10m"
+
+cache:
+  paths:
+    - .cache/pip
+
+# 1) Tests
+pytest:
+  stage: test
+  image: python:3.12-slim
+  before_script:
+    - python -V
+    - pip install -r requirements.txt
+    - pip install -r requirements-dev.txt || true
+  script:
+    - pytest -q
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+    paths:
+      - junit.xml
+
+# 2) SAST con Semgrep
+semgrep:
+  stage: sast
+  image: returntocorp/semgrep:latest
+  script:
+    - semgrep scan --config=auto --severity=ERROR --error .
+  allow_failure: false
+  needs: ["pytest"]
+
+# 3) SCA con Snyk
+snyk:
+  stage: sca
+  image: snyk/snyk:python
+  variables:
+    SNYK_DISABLE_ANALYTICS: "1"
+  script:
+    - snyk auth "$SNYK_TOKEN"
+    - snyk test --file=requirements.txt --package-manager=pip 
+--severity-threshold=high
+  allow_failure: false
+  needs: ["pytest"]
+
+# 4) Build & Push al GitLab Container Registry (Docker-in-Docker)
+build_image:
+  stage: build
+  image: docker:24
+  services:
+    - name: docker:24-dind
+      command: ["--tls=false"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - echo "Log in to GitLab Registry"
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" 
+"$CI_REGISTRY"
+    - IMAGE_TAG="$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"
+    - docker build -t "$IMAGE_TAG" .
+    - docker push "$IMAGE_TAG"
+    - echo "$IMAGE_TAG" > image_tag.txt
+  artifacts:
+    paths: [image_tag.txt]
+  needs: ["pytest"]
+
+# 5) Trivy (gate en HIGH/CRITICAL con fix)
+trivy_image:
+  stage: container_scan
+  image: aquasec/trivy:latest
+  script:
+    - IMAGE_TAG="$(cat image_tag.txt)"
+    - trivy image --timeout "$TRIVY_TIMEOUT" --severity "$TRIVY_SEVERITY" 
+--ignore-unfixed --exit-code 1 "$IMAGE_TAG"
+  allow_failure: false
+  needs: ["build_image"]
+
+# 6) SBOM CycloneDX
+sbom:
+  stage: sbom
+  image: aquasec/trivy:latest
+  script:
+    - IMAGE_TAG="$(cat image_tag.txt)"
+    - trivy image --format cyclonedx --output sbom.cdx.json "$IMAGE_TAG"
+  artifacts:
+    paths: [sbom.cdx.json]
+  needs: ["build_image"]
+
