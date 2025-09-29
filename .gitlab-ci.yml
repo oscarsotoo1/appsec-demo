@@ -43,6 +43,7 @@ semgrep:
 snyk:
   stage: sca
   image: snyk/snyk:python
+  entrypoint: [""]
   variables:
     SNYK_DISABLE_ANALYTICS: "1"
   script:
