@@ -1,1 +1,5 @@
 .env
+
+# SSH keys (no versionar)
+id_ed25519*
+nuevosskey*
