@@ -16,6 +16,7 @@ cache:
   paths:
     - .cache/pip
 
+# ---------- TEST ----------
 pytest:
   stage: test
   image: python:3.12-slim
@@ -24,7 +25,7 @@ pytest:
     - pip install -r requirements.txt
     - pip install -r requirements-dev.txt || true
   script:
-    - pytest -q
+    - pytest -q --junitxml=junit.xml
   artifacts:
     when: always
     reports:
@@ -32,15 +33,32 @@ pytest:
     paths:
       - junit.xml
 
-semgrep:
+# ---------- SAST (Semgrep) ----------
+# Produce reporte compatible con GitLab Security Dashboard
+semgrep_sast:
   stage: sast
   image: returntocorp/semgrep:latest
   script:
-    - semgrep scan --config=auto --severity=ERROR --error .
+    # Si tienes SEMGREP_APP_TOKEN configurado, usa 'semgrep ci' SIN --config
+    - |
+      if [ -n "$SEMGREP_APP_TOKEN" ]; then
+        echo "Running semgrep ci (authenticated)…"
+        semgrep ci --gitlab-sast --output gl-sast-report.json
+      else
+        echo "Running semgrep OSS (auto rules)…"
+        semgrep scan --config=auto --severity=ERROR --error --gitlab-sast --output gl-sast-report.json .
+      fi
+  artifacts:
+    when: always
+    reports:
+      sast: gl-sast-report.json
+    paths:
+      - gl-sast-report.json
   allow_failure: false
   needs: ["pytest"]
 
-snyk:
+# ---------- SCA (Snyk) ----------
+snyk_sca:
   stage: sca
   image:
     name: snyk/snyk:python
@@ -56,8 +74,7 @@ snyk:
   allow_failure: false
   needs: ["pytest"]
 
-
-
+# ---------- BUILD (Docker) ----------
 build_image:
   stage: build
   image: docker:24
@@ -79,6 +96,7 @@ build_image:
       - image_tag.txt
   needs: ["pytest"]
 
+# ---------- CONTAINER SCAN (Trivy) ----------
 trivy_image:
   stage: container_scan
   image:
@@ -90,6 +108,7 @@ trivy_image:
   allow_failure: false
   needs: ["build_image"]
 
+# ---------- SBOM (CycloneDX) ----------
 sbom:
   stage: sbom
   image:
@@ -102,11 +121,4 @@ sbom:
     paths:
       - sbom.cdx.json
   needs: ["build_image"]
-
-semgrep_sast:
-  stage: sast
-  image: returntocorp/semgrep:latest
-  script:
-    - semgrep ci --config auto
-  allow_failure: false
 
