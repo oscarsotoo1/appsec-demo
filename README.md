@@ -117,13 +117,6 @@ supply chain transparency.*
 
 ---
 
-### 🔑 Secrets Detection (Gitleaks)
-![Gitleaks](docs/gitleaks.png)  
-*Secrets detection report blocking leaked API keys or credentials.*
-
-
----
-
 ## 🚀 How to Run Locally
 ```bash
 # Clone repo
